@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="ur-Latn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YT Auto Uploader — GitHub Panel</title>
+<style>
+  :root{--bg:#0b0e14;--panel:#141922;--panel2:#1b2230;--line:#263041;--txt:#e6ebf4;
+        --dim:#8b97ad;--acc:#4f8cff;--ok:#2ecc71;--warn:#f5a524;--err:#ff5c5c;--run:#00c2d1}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-size:14.5px;
+       font-family:ui-sans-serif,system-ui,'Segoe UI',Roboto,Arial,sans-serif}
+  header{display:flex;align-items:center;gap:13px;padding:14px 22px;flex-wrap:wrap;
+         background:linear-gradient(90deg,#141922,#0f1420);border-bottom:1px solid var(--line);
+         position:sticky;top:0;z-index:20}
+  header h1{font-size:17px;margin:0;font-weight:700}
+  .logo{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:15px;
+        background:linear-gradient(135deg,#ff2d55,#ff8a00)}
+  .pill{font-size:12px;padding:5px 11px;border-radius:999px;background:var(--panel2);
+        border:1px solid var(--line);color:var(--dim);white-space:nowrap}
+  .pill.busy{color:#001b1e;background:var(--run);border-color:var(--run);font-weight:700}
+  .spacer{flex:1}
+  a{color:var(--acc);text-decoration:none}
+  .wrap{max-width:1220px;margin:0 auto;padding:18px 20px 60px;
+        display:grid;grid-template-columns:1.05fr .95fr;gap:18px}
+  @media(max-width:950px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;
+        margin-bottom:18px}
+  .card h2{margin:0 0 4px;font-size:15px}
+  .card .sub{color:var(--dim);font-size:12.5px;margin:0 0 14px}
+  label{display:block;font-size:12.5px;color:var(--dim);margin:12px 0 5px;font-weight:600}
+  input[type=text],input[type=url],input[type=password],textarea,select{
+    width:100%;padding:10px 12px;background:#0d1219;border:1px solid var(--line);
+    border-radius:9px;color:var(--txt);font-size:14px;font-family:inherit}
+  textarea{min-height:80px;resize:vertical}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--acc)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .file{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px dashed var(--line);
+        border-radius:9px;background:#0d1219;cursor:pointer;font-size:13px;color:var(--dim)}
+  .file:hover{border-color:var(--acc);color:var(--txt)}
+  .file input{display:none}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .chip{padding:9px 13px;border:1px solid var(--line);border-radius:9px;cursor:pointer;
+        background:#0d1219;font-size:13px;user-select:none}
+  .chip:hover{border-color:#3a4658}
+  .chip.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+  button{background:var(--acc);color:#fff;border:none;padding:12px 18px;border-radius:10px;
+         font-weight:700;cursor:pointer;font-size:14px;font-family:inherit}
+  button:hover{filter:brightness(1.1)} button:disabled{opacity:.5;cursor:not-allowed}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--dim);
+               padding:7px 12px;font-size:12.5px;font-weight:600}
+  button.ghost:hover{color:var(--txt);border-color:var(--acc)}
+  .ck{display:flex;align-items:flex-start;gap:9px;margin:11px 0;font-size:13px;color:var(--dim)}
+  .ck input{margin-top:2px;width:16px;height:16px;accent-color:var(--acc)}
+  .banner{padding:11px 14px;border-radius:10px;font-size:13px;margin-bottom:14px;border:1px solid}
+  .banner.warn{background:#2a1f05;border-color:#5c4409;color:#ffd77a}
+  .banner.err{background:#2a0d0d;border-color:#5c1616;color:#ffb3b3}
+  .banner.ok{background:#07240f;border-color:#12561f;color:#8ff0ac}
+  .job{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:10px;
+       background:var(--panel2)}
+  .job .top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .job .t{font-weight:650;flex:1;min-width:120px;font-size:13.5px}
+  .st{font-size:11px;padding:3px 9px;border-radius:999px;font-weight:700;text-transform:uppercase}
+  .st.queued{background:#2b3345;color:#9fb0cc}
+  .st.in_progress{background:var(--run);color:#00252a}
+  .st.success{background:#0f4023;color:#7ff0a8}
+  .st.failure{background:#4a1414;color:#ffa3a3}
+  .st.cancelled{background:#3a3a3a;color:#bbb}
+  .meta{font-size:11.5px;color:var(--dim);margin-top:7px;display:flex;gap:9px;flex-wrap:wrap}
+  .prog{height:5px;background:#0d1219;border-radius:99px;margin-top:9px;overflow:hidden}
+  .prog i{display:block;height:100%;border-radius:99px;
+          background:linear-gradient(90deg,var(--acc),var(--run))}
+  .prog.anim i{width:40%;animation:sl 1.4s ease-in-out infinite}
+  @keyframes sl{0%{margin-left:-40%}100%{margin-left:100%}}
+  details summary{cursor:pointer;color:var(--dim);font-size:12.5px;padding:4px 0}
+  .steps{font-size:12.5px;color:var(--dim);line-height:1.9;padding-left:18px;margin:8px 0 0}
+  .steps code{background:#0d1219;padding:2px 6px;border-radius:5px;color:#ffd77a;font-size:11.5px}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);padding:12px 20px;
+         border-radius:11px;font-size:13.5px;font-weight:600;z-index:99;opacity:0;
+         transition:.25s;pointer-events:none;box-shadow:0 8px 28px #0008;max-width:90vw}
+  .toast.show{opacity:1}
+  .toast.ok{background:var(--ok);color:#00230e} .toast.bad{background:var(--err);color:#fff}
+  .dot{width:9px;height:9px;border-radius:50%;background:#44506a;display:inline-block}
+  .dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">▶</div>
+  <h1>YT Auto Uploader</h1>
+  <span class="pill" id="qpill">connect nahi</span>
+  <div class="spacer"></div>
+  <span class="pill" id="repopill">—</span>
+  <button class="ghost" onclick="toggleSetup()">⚙️ Setup</button>
+</header>
+
+<div class="wrap">
+  <!-- ================= LEFT ================= -->
+  <div>
+    <!-- SETUP -->
+    <div class="card" id="setupCard" style="display:none">
+      <h2>⚙️ Setup <span style="font-size:11px;color:var(--dim);font-weight:400">(sirf ek baar)</span></h2>
+      <p class="sub">Yeh maloomat sirf aap ke browser me mehfooz hoti hain, kahin nahi jatin.</p>
+
+      <div class="row">
+        <div><label>GitHub username</label>
+          <input type="text" id="owner" placeholder="mera-username"></div>
+        <div><label>Repo ka naam</label>
+          <input type="text" id="repo" placeholder="ytauto"></div>
+      </div>
+
+      <label>GitHub Token (PAT)</label>
+      <input type="password" id="pat" placeholder="github_pat_xxxxx ya ghp_xxxxx">
+      <p class="sub" style="margin-top:6px">
+        Banayein: <b>github.com → Settings → Developer settings → Personal access tokens →
+        Fine-grained → Generate new token</b><br>
+        Repository access: sirf apni repo · Permissions: <b>Contents = Read&nbsp;and&nbsp;write</b>,
+        <b>Actions = Read&nbsp;and&nbsp;write</b>
+      </p>
+
+      <label>Channels ke naam (sirf dikhane ke liye)</label>
+      <div class="row" style="grid-template-columns:1fr 1fr 1fr">
+        <input type="text" id="cn1" placeholder="Channel 1">
+        <input type="text" id="cn2" placeholder="Channel 2">
+        <input type="text" id="cn3" placeholder="Channel 3">
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:10px">
+        <button onclick="saveCfg()">💾 Save aur Test</button>
+        <button class="ghost" onclick="clearCfg()">Sab mitao</button>
+      </div>
+      <div id="setupMsg" style="margin-top:12px"></div>
+    </div>
+
+    <!-- NAYI VIDEO -->
+    <div class="card">
+      <h2>🎬 Nayi Video Banao</h2>
+      <p class="sub">GitHub ke computer par video banegi aur aap ke channel par chali jayegi.</p>
+      <div id="formWarn"></div>
+
+      <form id="jobForm">
+        <label>1. Video Link</label>
+        <input type="url" id="video_url" placeholder="https://... (YouTube / Drive / direct mp4)">
+
+        <label>2. Files ZIP <span style="color:#5d6a80">(script + sync files, ~25 MB tak)</span></label>
+        <label class="file">
+          <input type="file" accept=".zip" id="zipIn">
+          <span>📦</span><span id="zipLbl">ZIP file chunein…</span>
+        </label>
+        <details style="margin-top:6px">
+          <summary>ZIP bari hai (25 MB se zyada)?</summary>
+          <label>ZIP ka direct download link</label>
+          <input type="url" id="zip_url" placeholder="https://.../mera.zip">
+        </details>
+
+        <label>3. Title</label>
+        <input type="text" id="title" required maxlength="100" placeholder="Video ka title">
+
+        <label>4. Description</label>
+        <textarea id="description" maxlength="5000" placeholder="Video ki tafseel..."></textarea>
+
+        <label>5. Tags <span style="color:#5d6a80">(comma se alag)</span></label>
+        <input type="text" id="tags" placeholder="music, lyrics, urdu">
+
+        <label>6. Thumbnail ka link <span style="color:#5d6a80">(optional)</span></label>
+        <input type="url" id="thumb_url" placeholder="https://.../thumb.jpg">
+
+        <label>7. Privacy</label>
+        <div class="chips" id="privChips">
+          <div class="chip on" data-v="private">🔒 Private</div>
+          <div class="chip" data-v="unlisted">🔗 Unlisted</div>
+          <div class="chip" data-v="public">🌍 Public</div>
+        </div>
+
+        <label>8. Channel</label>
+        <div class="chips" id="chanChips">
+          <div class="chip on" data-v="1">📺 Channel 1</div>
+          <div class="chip" data-v="2">📺 Channel 2</div>
+          <div class="chip" data-v="3">📺 Channel 3</div>
+        </div>
+
+        <label class="ck"><input type="checkbox" id="delprev">
+          <span>Upload ke baad is channel ki <b>purani YouTube video</b> bhi delete kar do
+          <span style="color:#f5a524">(ehtiyat se!)</span></span></label>
+
+        <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button type="submit" id="submitBtn">➕ Queue me daalo</button>
+          <span style="font-size:12px;color:var(--dim)">Ek waqt me ek hi video banti hai.</span>
+        </div>
+        <div id="upProg" style="margin-top:10px"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= RIGHT ================= -->
+  <div>
+    <div class="card">
+      <h2>📋 Queue &amp; History</h2>
+      <p class="sub">Har 6 second me khud update. Tafseeli log dekhne ke liye "log kholo" dabayein.</p>
+      <div id="jobs"><p style="color:var(--dim);font-size:13px">Pehle Setup mukammal karein.</p></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const WORKFLOW = 'make-and-upload.yml';
+let CFG = {};
+
+/* ---------------- helpers ---------------- */
+function toast(m, ok=true){
+  const t=$('#toast'); t.textContent=m; t.className='toast show '+(ok?'ok':'bad');
+  setTimeout(()=>t.className='toast', 4000);
+}
+function ago(iso){
+  if(!iso) return '';
+  const s=Math.floor((Date.now()-new Date(iso))/1000);
+  if(s<60) return s+'s pehle';
+  if(s<3600) return Math.floor(s/60)+'m pehle';
+  if(s<86400) return Math.floor(s/3600)+'h pehle';
+  return Math.floor(s/86400)+'d pehle';
+}
+function gh(path, opts={}){
+  return fetch('https://api.github.com'+path, {
+    ...opts,
+    headers:{
+      'Authorization':'Bearer '+CFG.pat,
+      'Accept':'application/vnd.github+json',
+      'X-GitHub-Api-Version':'2022-11-28',
+      ...(opts.body?{'Content-Type':'application/json'}:{}),
+      ...(opts.headers||{})
+    }
+  });
+}
+function toB64(file){
+  return new Promise((res, rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(String(r.result).split(',')[1]);
+    r.onerror=rej;
+    r.readAsDataURL(file);
+  });
+}
+
+/* ---------------- config ---------------- */
+function loadCfg(){
+  try{ CFG=JSON.parse(localStorage.getItem('ytauto_cfg')||'{}'); }catch(e){ CFG={}; }
+  $('#owner').value=CFG.owner||''; $('#repo').value=CFG.repo||''; $('#pat').value=CFG.pat||'';
+  $('#cn1').value=CFG.cn1||''; $('#cn2').value=CFG.cn2||''; $('#cn3').value=CFG.cn3||'';
+  applyNames();
+  if(!CFG.pat){ $('#setupCard').style.display='block';
+    $('#formWarn').innerHTML='<div class="banner warn">⚙️ Pehle upar <b>Setup</b> bharein, warna kuch kaam nahi karega.</div>';
+  } else {
+    $('#repopill').textContent=CFG.owner+'/'+CFG.repo;
+    loadRuns();
+  }
+}
+function applyNames(){
+  [1,2,3].forEach(i=>{
+    const c=$(`#chanChips .chip[data-v="${i}"]`);
+    if(c) c.textContent='📺 '+((CFG['cn'+i]||('Channel '+i)).slice(0,20));
+  });
+}
+async function saveCfg(){
+  CFG={owner:$('#owner').value.trim(), repo:$('#repo').value.trim(), pat:$('#pat').value.trim(),
+       cn1:$('#cn1').value.trim(), cn2:$('#cn2').value.trim(), cn3:$('#cn3').value.trim()};
+  if(!CFG.owner||!CFG.repo||!CFG.pat){ toast('Teeno khane bharein', false); return; }
+  $('#setupMsg').innerHTML='<div class="banner">⏳ Check kar raha hoon…</div>';
+  const r=await gh(`/repos/${CFG.owner}/${CFG.repo}`);
+  if(!r.ok){
+    $('#setupMsg').innerHTML='<div class="banner err">❌ Repo nahi mili ya token ghalat hai ('+r.status+
+      '). Username/repo ki spelling aur token ki permissions check karein.</div>';
+    return;
+  }
+  const w=await gh(`/repos/${CFG.owner}/${CFG.repo}/actions/workflows`);
+  const wd=w.ok?await w.json():{workflows:[]};
+  const has=(wd.workflows||[]).some(x=>x.path.endsWith(WORKFLOW));
+  localStorage.setItem('ytauto_cfg', JSON.stringify(CFG));
+  applyNames();
+  $('#repopill').textContent=CFG.owner+'/'+CFG.repo;
+  $('#formWarn').innerHTML = has ? '' :
+    '<div class="banner warn">⚠️ Repo me <code>.github/workflows/'+WORKFLOW+
+    '</code> nahi mili. Pehle saari files repo me upload karein.</div>';
+  $('#setupMsg').innerHTML='<div class="banner ok">✅ Sab theek hai! Repo mil gayi'+
+    (has?' aur workflow bhi maujood hai.':', lekin workflow file nahi mili.')+'</div>';
+  toast('✅ Save ho gaya');
+  loadRuns();
+}
+function clearCfg(){
+  if(!confirm('Saari settings mita dein?')) return;
+  localStorage.removeItem('ytauto_cfg'); location.reload();
+}
+function toggleSetup(){
+  const c=$('#setupCard'); c.style.display = c.style.display==='none' ? 'block' : 'none';
+}
+
+/* ---------------- chips ---------------- */
+['#privChips','#chanChips'].forEach(sel=>{
+  $$(sel+' .chip').forEach(c=>c.onclick=()=>{
+    $$(sel+' .chip').forEach(x=>x.classList.remove('on')); c.classList.add('on');
+  });
+});
+$('#zipIn').onchange=e=>{
+  const f=e.target.files[0];
+  $('#zipLbl').textContent = f ? `${f.name} (${(f.size/1e6).toFixed(1)} MB)` : 'ZIP file chunein…';
+  if(f && f.size > 30e6) toast('⚠️ ZIP 30 MB se bari hai — "bari ZIP" wala link use karein', false);
+};
+
+/* ---------------- submit ---------------- */
+$('#jobForm').onsubmit = async ev => {
+  ev.preventDefault();
+  if(!CFG.pat){ toast('Pehle Setup bharein', false); toggleSetup(); return; }
+  const title=$('#title').value.trim();
+  if(!title){ toast('Title zaroori hai', false); return; }
+  const zf=$('#zipIn').files[0];
+  if(!zf && !$('#video_url').value.trim() && !$('#zip_url').value.trim()){
+    toast('Kam az kam video link ya ZIP dein', false); return;
+  }
+
+  const btn=$('#submitBtn'); btn.disabled=true;
+  const P=$('#upProg');
+  try{
+    let repoPath='';
+    if(zf){
+      btn.textContent='⏳ ZIP bhej raha hoon…';
+      P.innerHTML='<div class="banner">📤 ZIP GitHub par ja rahi hai… (bari file me waqt lagta hai)</div>';
+      const b64=await toB64(zf);
+      const stamp=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+      repoPath=`uploads/${stamp}-${zf.name.replace(/[^\w.\-]/g,'_')}`;
+      const r=await gh(`/repos/${CFG.owner}/${CFG.repo}/contents/${repoPath}`, {
+        method:'PUT',
+        body: JSON.stringify({ message:`job: ${title}`, content:b64 })
+      });
+      if(!r.ok){
+        const e=await r.json().catch(()=>({}));
+        throw new Error('ZIP upload fail ('+r.status+'): '+(e.message||''));
+      }
+      P.innerHTML='<div class="banner ok">✅ ZIP chali gayi. Ab workflow chalu kar raha hoon…</div>';
+    }
+
+    btn.textContent='⏳ Workflow chalu…';
+    const inputs={
+      video_url: $('#video_url').value.trim(),
+      zip_url:   $('#zip_url').value.trim(),
+      zip_path_in_repo: repoPath,
+      title: title,
+      description: $('#description').value,
+      tags: $('#tags').value.trim(),
+      thumb_url: $('#thumb_url').value.trim(),
+      privacy: $('#privChips .chip.on').dataset.v,
+      channel: $('#chanChips .chip.on').dataset.v,
+      delete_prev: $('#delprev').checked ? 'yes' : 'no'
+    };
+    const d=await gh(`/repos/${CFG.owner}/${CFG.repo}/actions/workflows/${WORKFLOW}/dispatches`,{
+      method:'POST', body: JSON.stringify({ ref:'main', inputs })
+    });
+    if(!d.ok){
+      const e=await d.json().catch(()=>({}));
+      throw new Error('Workflow chalu nahi hua ('+d.status+'): '+(e.message||''));
+    }
+
+    P.innerHTML='<div class="banner ok">🎉 Job queue me lag gayi! Dayein taraf status dekhein.</div>';
+    toast('🎉 Job queue me lag gayi');
+    $('#jobForm').reset();
+    $('#zipLbl').textContent='ZIP file chunein…';
+    $$('#privChips .chip').forEach(x=>x.classList.remove('on'));
+    $('#privChips .chip[data-v="private"]').classList.add('on');
+    setTimeout(loadRuns, 2500);
+  }catch(err){
+    P.innerHTML='<div class="banner err">❌ '+err.message+'</div>';
+    toast(err.message, false);
+  }finally{
+    btn.disabled=false; btn.textContent='➕ Queue me daalo';
+  }
+};
+
+/* ---------------- runs list ---------------- */
+async function loadRuns(){
+  if(!CFG.pat) return;
+  let r;
+  try{ r=await gh(`/repos/${CFG.owner}/${CFG.repo}/actions/runs?per_page=12`); }
+  catch(e){ return; }
+  if(!r.ok) return;
+  const d=await r.json();
+  const runs=(d.workflow_runs||[]).filter(x=>x.path.endsWith(WORKFLOW));
+
+  const active=runs.filter(x=>x.status!=='completed').length;
+  $('#qpill').textContent = active ? `🔴 ${active} chal rahi / line me` : '🟢 free';
+  $('#qpill').className = 'pill' + (active?' busy':'');
+
+  if(!runs.length){
+    $('#jobs').innerHTML='<p style="color:var(--dim);font-size:13px">Abhi koi job nahi.</p>';
+    return;
+  }
+  $('#jobs').innerHTML = runs.map(x=>{
+    const done = x.status==='completed';
+    const cls  = done ? (x.conclusion||'failure') : (x.status==='queued'?'queued':'in_progress');
+    const label= done ? (x.conclusion==='success'?'DONE':(x.conclusion||'FAILED'))
+                      : (x.status==='queued'?'QUEUED':'RUNNING');
+    const name = (x.display_title||x.name||'').slice(0,50);
+    return `<div class="job">
+      <div class="top">
+        <span class="st ${cls}">${label}</span>
+        <span class="t">#${x.run_number} ${name}</span>
+        <a class="ghost" style="padding:6px 11px;border:1px solid var(--line);border-radius:8px;
+           font-size:12px" href="${x.html_url}" target="_blank">log kholo ↗</a>
+      </div>
+      <div class="prog ${done?'':'anim'}"><i style="${done?'width:100%':''}"></i></div>
+      <div class="meta">
+        <span>${done ? (x.conclusion==='success'?'✅ mukammal':'❌ fail — log dekhein')
+                     : (x.status==='queued'?'⏳ apni baari ka intezaar':'⚙️ kaam ho raha hai')}</span>
+        <span>•</span><span>${ago(x.created_at)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+loadCfg();
+setInterval(loadRuns, 6000);
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4122395deadf8d0',t:'MTc5MDQyNDM0OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
