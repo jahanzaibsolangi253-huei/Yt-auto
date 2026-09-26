@@ -1,0 +1,200 @@
+# =============================================================================
+#  100% FREE — koi server nahi chahiye!
+#  GitHub apna computer (4 CPU, 16 GB RAM) deta hai, wahan video banti hai
+#  aur seedha aap ke YouTube channel par chali jati hai.
+#
+#  Chalane ke 2 tareeqe:
+#   1. Apna panel (web/index.html) — khoobsurat form  ⭐ behtar
+#   2. GitHub website > Actions tab > "Run workflow"
+#
+#  QUEUE: neeche "concurrency" ki wajah se ek waqt me ek hi video banti hai,
+#         baqi apni baari ka intezaar karti hain.
+# =============================================================================
+name: Make & Upload Video
+run-name: "🎬 ${{ inputs.title }} → Channel ${{ inputs.channel }} (${{ inputs.privacy }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: "Video link (YouTube / Drive / direct mp4)"
+        required: false
+        default: ""
+      zip_path_in_repo:
+        description: "Repo ke andar ZIP ka path (misaal: uploads/mera.zip)"
+        required: false
+        default: ""
+      zip_url:
+        description: "Ya ZIP ka direct download link"
+        required: false
+        default: ""
+      title:
+        description: "Video ka Title"
+        required: true
+      description:
+        description: "Description"
+        required: false
+        default: ""
+      tags:
+        description: "Tags (comma se alag)"
+        required: false
+        default: ""
+      thumb_url:
+        description: "Thumbnail image ka link (optional)"
+        required: false
+        default: ""
+      privacy:
+        description: "Privacy"
+        required: true
+        default: "private"
+        type: choice
+        options: [private, unlisted, public]
+      channel:
+        description: "Kaunsa channel?"
+        required: true
+        default: "1"
+        type: choice
+        options: ["1", "2", "3"]
+      delete_prev:
+        description: "Purani YouTube video bhi delete karein?"
+        required: false
+        default: "no"
+        type: choice
+        options: ["no", "yes"]
+
+# ---- YEHI QUEUE HAI -------------------------------------------------------
+concurrency:
+  group: video-render-queue
+  cancel-in-progress: false      # nayi job purani ko cancel nahi karegi, line me lagegi
+
+permissions:
+  contents: write                # taake kaam ke baad ZIP repo se delete kar sake
+
+jobs:
+  render-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350          # GitHub ki max limit 6 ghante
+
+    steps:
+      - name: "1/8  Code laao"
+        uses: actions/checkout@v4
+
+      - name: "2/8  ffmpeg aur libraries lagao"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg unzip
+          python -m pip install -q --upgrade pip
+          pip install -q yt-dlp google-api-python-client google-auth-oauthlib google-auth-httplib2
+          echo "ffmpeg: $(ffmpeg -version | head -1)"
+
+      - name: "3/8  ZIP laao aur kholo"
+        run: |
+          set -e
+          mkdir -p work
+          if [ -n "${{ inputs.zip_path_in_repo }}" ] && [ -f "${{ inputs.zip_path_in_repo }}" ]; then
+            echo "→ repo se ZIP li: ${{ inputs.zip_path_in_repo }}"
+            cp "${{ inputs.zip_path_in_repo }}" work/project.zip
+          elif [ -n "${{ inputs.zip_url }}" ]; then
+            echo "→ link se ZIP download..."
+            curl -fsSL "${{ inputs.zip_url }}" -o work/project.zip
+          fi
+          if [ -f work/project.zip ]; then
+            unzip -q -o work/project.zip -d work/
+            rm work/project.zip
+            cd work
+            # agar ZIP ke andar sirf ek folder hai to uska saman bahar le aao
+            if [ "$(ls -1 | wc -l)" = "1" ] && [ -d "$(ls)" ]; then
+              d="$(ls)"; mv "$d"/* "$d"/.[!.]* . 2>/dev/null || true; rmdir "$d" 2>/dev/null || true
+            fi
+            echo "--- ZIP ke andar yeh files hain ---"; ls -la
+          else
+            echo "→ koi ZIP nahi di gayi"
+          fi
+
+      - name: "4/8  Video link download karo"
+        if: inputs.video_url != ''
+        run: |
+          cd work
+          yt-dlp --no-playlist --no-warnings -f 'bv*+ba/b' --merge-output-format mp4 \
+                 -o 'input.%(ext)s' "${{ inputs.video_url }}" \
+            || curl -fsSL "${{ inputs.video_url }}" -o input.mp4
+          ls -lh input.* || echo "download nahi hui"
+
+      - name: "5/8  Thumbnail download karo"
+        if: inputs.thumb_url != ''
+        run: curl -fsSL "${{ inputs.thumb_url }}" -o work/_thumb.jpg || echo "thumbnail nahi mili"
+
+      - name: "6/8  Aap ki script chalao (VIDEO BAN RAHI HAI)"
+        env:
+          VIDEO_URL:    ${{ inputs.video_url }}
+          OUTPUT_VIDEO: ${{ github.workspace }}/work/output.mp4
+          VIDEO_TITLE:  ${{ inputs.title }}
+          JOB_ID:       ${{ github.run_number }}
+        run: |
+          set -e
+          cd work
+          export WORK_DIR="$PWD"
+          f=$(ls input.* 2>/dev/null | head -1 || true)
+          [ -n "$f" ] && export INPUT_VIDEO="$PWD/$f" || export INPUT_VIDEO=""
+          echo "INPUT_VIDEO = $INPUT_VIDEO"
+          echo "OUTPUT_VIDEO = $OUTPUT_VIDEO"
+          [ -f requirements.txt ] && pip install -q -r requirements.txt || true
+          if   [ -f run.sh ];       then bash run.sh
+          elif [ -f start.sh ];     then bash start.sh
+          elif [ -f run.py ];       then python run.py
+          elif [ -f main.py ];      then python main.py
+          elif [ -f script.py ];    then python script.py
+          elif [ -f make_video.py ];then python make_video.py
+          elif [ -n "$INPUT_VIDEO" ]; then
+              echo "→ koi script nahi mili, video waise hi upload kar raha hoon"
+              cp "$INPUT_VIDEO" "$OUTPUT_VIDEO"
+          else
+              echo "❌ na koi script mili na video. ZIP me run.sh ya main.py rakhein."
+              ls -la; exit 1
+          fi
+
+      - name: "7/8  Bani hui video dhoondo"
+        id: find
+        run: |
+          cd work
+          if [ -f output.mp4 ] && [ -s output.mp4 ]; then
+            f="output.mp4"
+          else
+            f=$(find . -type f \( -name '*.mp4' -o -name '*.mkv' -o -name '*.mov' -o -name '*.webm' \) \
+                ! -name 'input.*' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-)
+          fi
+          if [ -z "$f" ]; then echo "❌ koi output video nahi mili"; ls -laR; exit 1; fi
+          echo "file=$PWD/${f#./}" >> $GITHUB_OUTPUT
+          ls -lh "$f"
+
+      - name: "8/8  YouTube par upload karo"
+        env:
+          YT_TOKEN_JSON: ${{ inputs.channel == '1' && secrets.YT_TOKEN_1
+                          || inputs.channel == '2' && secrets.YT_TOKEN_2
+                          ||                          secrets.YT_TOKEN_3 }}
+          VIDEO_FILE:    ${{ steps.find.outputs.file }}
+          VIDEO_TITLE:   ${{ inputs.title }}
+          VIDEO_DESC:    ${{ inputs.description }}
+          VIDEO_TAGS:    ${{ inputs.tags }}
+          VIDEO_PRIVACY: ${{ inputs.privacy }}
+          THUMB_FILE:    ${{ github.workspace }}/work/_thumb.jpg
+          DELETE_PREV:   ${{ inputs.delete_prev == 'yes' && '1' || '0' }}
+        run: python tools/ci_upload.py
+
+      - name: "Safai — ZIP repo se hatao"
+        if: always() && inputs.zip_path_in_repo != ''
+        continue-on-error: true
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f "${{ inputs.zip_path_in_repo }}" ]; then
+            git rm -q "${{ inputs.zip_path_in_repo }}"
+            git commit -q -m "🗑 safai: ${{ inputs.zip_path_in_repo }} hata diya [skip ci]"
+            git pull --rebase -q origin main || true
+            git push -q origin HEAD:main
+            echo "✅ ZIP repo se delete ho gayi"
+          fi
+
+      - name: "Safai — saari files delete"
+        if: always()
+        run: rm -rf work
